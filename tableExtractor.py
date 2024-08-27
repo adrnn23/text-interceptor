@@ -2,9 +2,11 @@ import pytesseract
 import numpy as np
 import cv2
 import pandas as pd
-import imutils
 import textInterceptor as ti
 from tkinter import messagebox 
+from tkinter.ttk import *
+from tkinter import *
+import threading
 
 # Tesseract OCR
 pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files/Tesseract-OCR/tesseract.exe'
@@ -20,7 +22,7 @@ def preProcessImage(image):
     return cv2.bitwise_not(grayImage)
 
 # Function return true if analyzed area is probably table
-def isTable(contours, imageArea, minContours=4, minCellArea=20):
+def isTable(contours, minContours=4, minCellArea=20):
 
     if len(contours) < minContours:
         print("Contours < 4")
@@ -85,7 +87,7 @@ def detectTableStructure(image):
         potentialTableImage = image[y:y+h, x:x+w]
 
         contours, _ = cv2.findContours(potentialTable, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-        if(isTable(contours, image.shape[0]*image.shape[1], 4, 20)):
+        if(isTable(contours, 4, 20)):
             return True, contours, potentialTableImage
 
     return False, [], []
@@ -95,34 +97,61 @@ def extractTable(inputPath):
 
     image = cv2.imread(inputPath)
     if image is None:
-        messagebox.showinfo("Result.", f"Loading file error: {inputPath}") 
+        messagebox.showerror("Result.", f"Loading file error: {inputPath}") 
         return
 
     isTable, contours, image = detectTableStructure(image)
     
     if isTable:
         messagebox.showinfo("Result.", "Table is detected.") 
-        data = []
-        for i in range(len(contours)-1):
-            x, y, w, h = cv2.boundingRect(contours[i])
-            if w > 10 and h > 10:
-                cell = image[y:y+h, x:x+w]
-                text = pytesseract.image_to_string(cell, config='--psm 6')
-                data.append((y, x, text.strip()))
 
-        # Adding cells to table 
-        rows = {}
-        for y, x, text in data:
-            if y not in rows:
-                rows[y] = {}
-            rows[y][x] = text
+        progressbarWindow = Tk()
+        progressbarWindow.geometry('500x50')
+        progressbarWindow.title("Converting to xlsx...")
+        progressbarWindow.configure(bg='black')
+        progressbarWindow.resizable(False,False)
+        bar = Progressbar(progressbarWindow, orient="horizontal", length=500)
+        bar.pack(pady=10)
 
-        table_list = []
-        for y in sorted(rows.keys()):
-            row = rows[y]
-            table_list.append([row[x] if x in row else '' for x in sorted(row.keys())])
-
-        df = pd.DataFrame(table_list)
-        ti.saveXlsx(df)
+        # Start a new thread for processing the table
+        savingThread = threading.Thread(target=savingTable, args=(contours, bar, image, progressbarWindow))
+        savingThread.start()
+        progressbarWindow.mainloop()
+        
     else:
         messagebox.showinfo("Result.", "Image without table.") 
+
+def savingTable(contours, bar, image, progressbarWindow):
+    progress = int(500/(len(contours)-1))
+    temp = 0
+
+    data = []
+    bar.config(value=0)
+    for i in range(len(contours)-1):
+        x, y, w, h = cv2.boundingRect(contours[i])
+        if w > 10 and h > 10:
+            cell = image[y:y+h, x:x+w]
+            text = pytesseract.image_to_string(cell, config='-l eng+pol --psm 6')
+            data.append((y, x, text.strip()))
+            temp += progress
+            bar.config(value = temp)
+            bar.update()
+
+    # Adding cells to table 
+    rows = {}
+    for y, x, text in data:
+        if y not in rows:
+            rows[y] = {}
+        rows[y][x] = text
+
+    table_list = []
+    for y in sorted(rows.keys()):
+        row = rows[y]
+        table_list.append([row[x] if x in row else '' for x in sorted(row.keys())])
+
+    df = pd.DataFrame(table_list)
+
+    # Ensures that destroy() is executed only after the current function completes its execution
+    progressbarWindow.after(0, progressbarWindow.destroy)
+    messagebox.showinfo("Result.", "Conversion completed.")
+    ti.saveXlsx(df)
