@@ -92,66 +92,49 @@ def detectTableStructure(image):
 
     return False, [], []
 
-# Table extraction, reading text from cells and saving it in DataFrame
-def extractTable(inputPath):
+class TableExtractor:
+    # Table extraction, reading text from cells and saving it in DataFrame
+    def extractTable(self, inputPath):
+        image = cv2.imread(inputPath)
+        if image is None:
+            messagebox.showerror("Result.", f"Loading file error: {inputPath}") 
+            return
 
-    image = cv2.imread(inputPath)
-    if image is None:
-        messagebox.showerror("Result.", f"Loading file error: {inputPath}") 
-        return
-
-    isTable, contours, image = detectTableStructure(image)
-    
-    if isTable:
-        messagebox.showinfo("Result.", "Table is detected.") 
-
-        progressbarWindow = Tk()
-        progressbarWindow.geometry('500x50')
-        progressbarWindow.title("Converting to xlsx...")
-        progressbarWindow.configure(bg='black')
-        progressbarWindow.resizable(False,False)
-        bar = Progressbar(progressbarWindow, orient="horizontal", length=500)
-        bar.pack(pady=10)
-
-        # Start a new thread for processing the table
-        savingThread = threading.Thread(target=savingTable, args=(contours, bar, image, progressbarWindow))
-        savingThread.start()
-        progressbarWindow.mainloop()
+        isTable, contours, image = detectTableStructure(image)
         
-    else:
-        messagebox.showinfo("Result.", "Image without table.") 
+        if isTable:
+            messagebox.showinfo("Result.", "Table is detected.") 
+            df = self.savingTable(contours, image)
+            if df is not None:
+                return df
+        else:
+            messagebox.showinfo("Result.", "Image without table.") 
+        return None
+    
+    # Function takes single cell from table, detects text and put it into DataFrame 
+    def savingTable(self, contours, image):
+        data = []
+        for i in range(len(contours)-1):
+            x, y, w, h = cv2.boundingRect(contours[i])
+            if w > 10 and h > 10:
+                cell = image[y:y+h, x:x+w]
+                text = pytesseract.image_to_string(cell, config='-l eng+pol --psm 6')
+                data.append((y, x, text.strip()))
 
-def savingTable(contours, bar, image, progressbarWindow):
-    progress = int(500/(len(contours)-1))
-    temp = 0
+        # Adding cells to table 
+        rows = {}
+        for y, x, text in data:
+            if y not in rows:
+                rows[y] = {}
+            rows[y][x] = text
 
-    data = []
-    bar.config(value=0)
-    for i in range(len(contours)-1):
-        x, y, w, h = cv2.boundingRect(contours[i])
-        if w > 10 and h > 10:
-            cell = image[y:y+h, x:x+w]
-            text = pytesseract.image_to_string(cell, config='-l eng+pol --psm 6')
-            data.append((y, x, text.strip()))
-            temp += progress
-            bar.config(value = temp)
-            bar.update()
+        tableList = []
+        for y in sorted(rows.keys()):
+            row = rows[y]
+            tableList.append([row[x] if x in row else '' for x in sorted(row.keys())])
 
-    # Adding cells to table 
-    rows = {}
-    for y, x, text in data:
-        if y not in rows:
-            rows[y] = {}
-        rows[y][x] = text
-
-    table_list = []
-    for y in sorted(rows.keys()):
-        row = rows[y]
-        table_list.append([row[x] if x in row else '' for x in sorted(row.keys())])
-
-    df = pd.DataFrame(table_list)
-
-    # Ensures that destroy() is executed only after the current function completes its execution
-    progressbarWindow.after(0, progressbarWindow.destroy)
-    messagebox.showinfo("Result.", "Conversion completed.")
-    ti.saveTable(df)
+        df = pd.DataFrame(tableList)
+        messagebox.showinfo("Result.", "Conversion completed.")
+        if df is not None:
+            return df
+        return None
