@@ -3,6 +3,10 @@ import tkinter.ttk as ttk
 from tkinter import filedialog
 from tkinter import messagebox 
 import tableExtractor
+import textExtractor
+import numpy as np
+import os
+import datetime
 
 # Main window configuration
 def setMainWindow():
@@ -30,8 +34,8 @@ def setCheckbutton(window, iText, intvar):
                     variable = intvar, onvalue = 1, offvalue = 0).pack(pady=10)
     return checkbutton
 
-# Open file function
-def openFile():
+# Open file and extract table
+def openFileExtractTable():
     filepath = filedialog.askopenfilename(title="Open image")
     if filepath.endswith(('.png', '.jpg', '.jpeg')):
         with open(filepath, 'r') as file:
@@ -41,9 +45,20 @@ def openFile():
     else:
         messagebox.showerror("Error.", "Incorrect file type.") 
 
+# Open file and extract text from image
+def openFileExtractTextFromImage():
+    filepath = filedialog.askopenfilename(title="Open image")
+    if filepath.endswith(('.png', '.jpg', '.jpeg')):
+        with open(filepath, 'r') as file:
+            textExtractor.extractText(filepath)
+    elif filepath.endswith(("")):
+        return
+    else:
+        messagebox.showerror("Error.", "Incorrect file type.") 
+
 # Zapis tabelki z obrazu do pliku xlsx
-def saveXlsx(df):
-    filepath = filedialog.asksaveasfilename(title="Save Excel file", defaultextension=".xlsx", filetypes=[("Excel files", ".xlsx .xls"), ("CSV", ".csv")])
+def saveTable(df):
+    filepath = filedialog.asksaveasfilename(title="Save converted table", defaultextension=".xlsx", filetypes=[("Excel files", ".xlsx .xls"), ("CSV", ".csv")])
     if filepath:
         if filepath.endswith(".csv"):
             df.to_csv(filepath, index=False, header=False)
@@ -52,29 +67,59 @@ def saveXlsx(df):
         else:
             messagebox.showerror("Error.", "Incorrect file type.") 
 
+# Save text to file
+def saveText(text):
+    filepath = filedialog.asksaveasfilename(title="Save converted text", defaultextension=".txt", filetypes=[("Txt files", ".txt")])
+    if filepath:
+        if filepath.endswith(".txt"):
+           with open(filepath, 'w') as file:
+            #    report = ReportInfo(filepath)
+               file.write(text)
+               #file.read()
+        else:
+            messagebox.showerror("Error.", "Incorrect file type.") 
+
+
+# class ReportInfo:
+
+#     def countWords(self):
+#         with open(self.filepath, 'r') as file:
+#             text = file.read()
+#             print(self.filepath)
+#             self.words = len(text.split())
+#             print(self.words)
+
+#     def __init__(self, iFilepath):
+#         self.filepath = os.path.normpath(iFilepath)
+#         self.name = os.path.split(self.filepath)[1]
+#         self.datetime = datetime.datetime.now().ctime()
+#         self.words = self.countWords()
+        
+
 # Text interceptor main view
-def textInterceptor():
+class TextInterceptor:
 
-    mainWindow = setMainWindow()
-    Checkbutton1 = IntVar()
+    def __init__(self):
+        self.mainWindow = setMainWindow()
+        self.Checkbutton1 = IntVar()
+        self.tabControl = ttk.Notebook(self.mainWindow)
 
-    tabControl = ttk.Notebook(mainWindow)
-    mainPage = ttk.Frame(tabControl) 
-    optionsPage = ttk.Frame(tabControl) 
+        self.mainPage = ttk.Frame(self.tabControl) 
+        self.optionsPage = ttk.Frame(self.tabControl) 
 
-    tabControl.add(mainPage, text ='Main') 
-    tabControl.add(optionsPage, text ='Options') 
-    tabControl.pack(expand = 1, fill ="both") 
+        self.tabControl.add(self.mainPage, text ='Main') 
+        self.tabControl.add(self.optionsPage, text ='Options') 
+        self.tabControl.pack(expand = 1, fill ="both") 
     
-    setTitleLabel(mainPage, "Text Interceptor 1.0")
-    setButton(mainPage, openFile, "Extract text from image")
-    setButton(mainPage, openFile, "Extract text from video")
-    setButton(mainPage, openFile, "Extract table from image")
-    setButton(mainPage, mainWindow.destroy, "Quit")
+        setTitleLabel(self.mainPage, "Text Interceptor 1.0")
+        setButton(self.mainPage, openFileExtractTextFromImage, "Extract text from image")
+        setButton(self.mainPage, openFileExtractTextFromImage, "Extract text from video")
+        setButton(self.mainPage, openFileExtractTable, "Extract table from image")
+        setButton(self.mainPage, self.mainWindow.destroy, "Quit")
 
-    setCheckbutton(optionsPage,"Generate raport after text conversion", Checkbutton1)
-    setButton(optionsPage, mainWindow.destroy, "Quit")
-    mainWindow.mainloop()
+        setCheckbutton(self.optionsPage,"Generate raport after text conversion", self.Checkbutton1)
+        setButton(self.optionsPage, self.mainWindow.destroy, "Quit")
+        self.mainWindow.mainloop()
 
 if __name__ == '__main__':
-    textInterceptor()
+    ti = TextInterceptor()

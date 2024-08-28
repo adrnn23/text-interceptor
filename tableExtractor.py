@@ -154,4 +154,4 @@ def savingTable(contours, bar, image, progressbarWindow):
     # Ensures that destroy() is executed only after the current function completes its execution
     progressbarWindow.after(0, progressbarWindow.destroy)
     messagebox.showinfo("Result.", "Conversion completed.")
-    ti.saveXlsx(df)
+    ti.saveTable(df)
