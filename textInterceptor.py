@@ -4,7 +4,6 @@ from tkinter import filedialog
 from tkinter import messagebox 
 import tableExtractor
 import textExtractor
-import numpy as np
 import os
 import datetime
 
@@ -20,7 +19,7 @@ def setMainWindow():
 def setTitleLabel(window, text):
     title = StringVar()
     title.set(text)
-    label = ttk.Label(window, textvariable=title, anchor=CENTER, justify=CENTER, width=30)
+    label = Label(window, textvariable=title, justify=CENTER, font=("Arial, 16"))
     label.pack(pady=10)
     return label
 
@@ -34,84 +33,170 @@ def setCheckbutton(window, iText, intvar):
                     variable = intvar, onvalue = 1, offvalue = 0).pack(pady=10)
     return checkbutton
 
-# ReportInfo class maintains data about image to text conversion
+# ReportInfo class maintains data about image to text conversion (filename, conversion date, number of words, 5 most common words in text)
 class ReportInfo:
+    # Find 5 most common words in text
+    def mostCommonWords(self, iText):
+        try:
+            if (iText is not None and iText != ""):
+                text = iText.split()
+                uniqueWords  = []
+                for t in text:
+                    if(len(text)>0):
+                        uniqueWords.append((text.count(t), t))
+                        number = text.count(t)
+                        for _ in range(number):
+                            text.remove(t)
+                uniqueWords.sort(key=lambda tuple: tuple[0], reverse=True) # Sort by number of occurrences
+                return uniqueWords[0:5] # Return 5 most common words in text
+            else:
+                return []
+        except Exception as e:
+            messagebox.showerror("Error", e) 
+            return []
+
     def __init__(self, iFilepath, iText):
-        self.name = os.path.split(iFilepath)[1]
+        self.filename = os.path.split(iFilepath)[1]
         self.datetime = datetime.datetime.now()
-        self.words = len(iText.split())
+        self.wordsCount = len(iText.split())
+        self.mostCommonWordsCount = self.mostCommonWords(iText)
+
+    # Report generating
+    def generateReport(self):
+        reportWindow = Tk()
+        reportWindow.geometry('380x140')
+        reportWindow.title(f"Report of {self.filename}")
+        reportWindow.resizable(False,False)
+        textWidget = Text(reportWindow, height=50, width=50)
+        textWidget.pack()
+
+        wordsWithNumbers = ""
+        for word in self.mostCommonWordsCount:
+            wordsWithNumbers += str(word[1]) + "(" + str(word[0]) + ")" + "\n"
+
+        textWidget.insert(INSERT, f"Filename: {self.filename} \nDatetime: {str(self.datetime)[:-7]} \nWords: {self.wordsCount} \nThe most common words: {wordsWithNumbers}")  
+        reportWindow.mainloop()
 
 # Main class TextInterceptor 
 class TextInterceptor:
     def __init__(self):
         self.textExtractor = textExtractor.TextExtractor()
         self.tableExtractor = tableExtractor.TableExtractor()
-        self.mainWindow = setMainWindow()
-        self.Checkbutton1 = IntVar()
-        self.tabControl = ttk.Notebook(self.mainWindow)
 
+        self.mainWindow = setMainWindow()
+
+        self.Checkbutton1 = IntVar()
+
+        self.tabControl = ttk.Notebook(self.mainWindow)
         self.mainPage = ttk.Frame(self.tabControl) 
         self.optionsPage = ttk.Frame(self.tabControl) 
-
         self.tabControl.add(self.mainPage, text='Main') 
         self.tabControl.add(self.optionsPage, text='Options') 
         self.tabControl.pack(expand=1, fill="both") 
 
+        # Text interceptor main page
         setTitleLabel(self.mainPage, "Text Interceptor 1.0")
         setButton(self.mainPage, self.extractTextFromImage, "Extract text from image")
         setButton(self.mainPage, self.extractTextFromVideo, "Extract text from video")
         setButton(self.mainPage, self.extractTableFromImage, "Extract table from image")
         setButton(self.mainPage, self.mainWindow.destroy, "Quit")
 
+        # Options page
+        setTitleLabel(self.optionsPage, "Options")
         setCheckbutton(self.optionsPage, "Generate report after text conversion", self.Checkbutton1)
         setButton(self.optionsPage, self.mainWindow.destroy, "Quit")
         self.mainWindow.mainloop()
 
     def extractTableFromImage(self):
-        filepath = filedialog.askopenfilename(title="Open image")
-        if filepath.endswith(('.png', '.jpg', '.jpeg')):
+        try:
+            filepath = filedialog.askopenfilename(title="Open image")
+            if filepath == "":
+                return
+            if not filepath.endswith(('.png', '.jpg', '.jpeg')):
+                messagebox.showwarning("Warning", "Incorrect file type.")
+                return
+            
             df = self.tableExtractor.extractTable(filepath)
             if df is not None:
                 self.saveTable(df)
-        elif filepath == "":
-            return
-        else:
-            messagebox.showerror("Error.", "Incorrect file type.") 
+            else:
+                messagebox.showwarning("Warning", "No table found in the image.")
+
+        except FileNotFoundError as e:
+            messagebox.showerror("Error", e) 
+        except IOError as e:
+            messagebox.showerror("Error", e) 
+        except Exception as e:
+            messagebox.showerror("Error", e) 
 
     def extractTextFromImage(self):
-        filepath = filedialog.askopenfilename(title="Open image")
-        if filepath.endswith(('.png', '.jpg', '.jpeg')):
+        try:
+            filepath = filedialog.askopenfilename(title="Open image")
+            if filepath == "":
+                return
+            if not filepath.endswith(('.png', '.jpg', '.jpeg')):
+                messagebox.showwarning("Warning", "Incorrect file type.")
+                return
+
             text = self.textExtractor.extractText(filepath)
             if text is not None:
                 self.saveText(text)
-        elif filepath == "":
-            return
-        else:
-            messagebox.showerror("Error.", "Incorrect file type.") 
+            else:
+                messagebox.showwarning("Warning", "No text found in the image.")
 
+        except FileNotFoundError as e:
+            messagebox.showerror("Error", e) 
+        except IOError as e:
+            messagebox.showerror("Error", e) 
+        except Exception as e:
+            messagebox.showerror("Error", e) 
+
+    # Function to implement
     def extractTextFromVideo(self):
-        messagebox.showinfo("Info", "Function is not implemented.")
+        try:
+            messagebox.showinfo("Info", "Function is not implemented.")
+        except Exception as e:
+            messagebox.showerror("Error", e) 
 
     def saveText(self, text):
-        filepath = filedialog.asksaveasfilename(title="Save converted text", defaultextension=".txt", filetypes=[("Txt files", ".txt")])
-        if filepath.endswith(".txt"):
-            with open(filepath, 'w') as file:
+        try:
+            filepath = filedialog.asksaveasfilename(title="Save converted text", defaultextension=".txt", filetypes=[("Txt files", ".txt")])
+            if filepath == "":
+                return
+            if not filepath.endswith(".txt"):
+                messagebox.showwarning("Warning", "Incorrect file type.")
+                return
+            
+            with open(filepath, 'w+') as file:
                 file.write(text)
                 if self.Checkbutton1.get() == 1:
                     report = ReportInfo(filepath, text)
-                    print(report.name, report.datetime, report.words)
-        else:
-            messagebox.showerror("Error.", "Incorrect file type.") 
+                    # print(report.filename, report.datetime, report.wordsCount, report.mostCommonWordsCount)
+                    report.generateReport()
+
+        except IOError as e:
+            messagebox.showerror("Error", e) 
+        except Exception as e:
+            messagebox.showerror("Error", e) 
 
     def saveTable(self, df):
-        filepath = filedialog.asksaveasfilename(title="Save converted table", defaultextension=".xlsx", filetypes=[("Excel files", ".xlsx .xls"), ("CSV", ".csv")])
-        if filepath:
-            if filepath.endswith(".csv"):
-                df.to_csv(filepath, index=False, header=False)
-            elif(filepath.endswith(".xlsx") or filepath.endswith(".xls")): 
+        try:
+            filepath = filedialog.asksaveasfilename(title="Save converted table", defaultextension=".xlsx", filetypes=[("Excel files", ".xlsx .xls"), ("CSV", ".csv")])
+            if filepath == "":
+                return
+            
+            if (filepath.endswith(".xlsx") or filepath.endswith(".xls")):
                 df.to_excel(filepath, index=False, header=False)
+            elif filepath.endswith(".csv"):
+                df.to_csv(filepath, index=False, header=False)
             else:
-                messagebox.showerror("Error.", "Incorrect file type.") 
+                messagebox.showwarning("Warning", "Incorrect file type.")
+                return
+
+        except IOError as e:
+            messagebox.showerror("Error", e) 
+        except Exception as e:
+            messagebox.showerror("Error", e) 
 
 if __name__ == '__main__':
     textInterceptor = TextInterceptor()

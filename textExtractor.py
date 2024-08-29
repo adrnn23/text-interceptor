@@ -21,27 +21,33 @@ class TextExtractor:
 
     # Extract text from image 
     def extractText(self, filepath):
-        image = cv2.imread(filepath)
-        if image is None:
-            messagebox.showerror("Error.", f"Loading file error: {filepath}")
-            return
+        try:
+            image = cv2.imread(filepath)
+            if image is None:
+                messagebox.showerror("Error", f"Loading file error: {filepath}")
+                return
+            
+            cv2.imshow('Image', image)
+            cv2.setMouseCallback('Image', self.getMouseClickPosition)
+
+            while True:
+                if self.clicked:
+                    # Cropping the image with text, using mouse position at LBUTTONDOWN and LBUTTONUP
+                    img = image[self.y0:self.y1, self.x0:self.x1]
+                    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)   
+                    text = pytesseract.image_to_string(gray, config='-l eng+pol --psm 6')
+                    self.clicked = False
+                    if text:
+                        cv2.destroyAllWindows()
+                        return text  
+
+                # Wait for key, if q is pressed then close the window
+                if (cv2.waitKey(1) and 0xFF == ord('q')):
+                    break
+
+            cv2.destroyAllWindows()
+            return None
         
-        cv2.imshow('image', image)
-        cv2.setMouseCallback('image', self.getMouseClickPosition)
-        while True:
-            if self.clicked:
-                # Cropping the image with text, using mouse position at LBUTTONDOWN and LBUTTONUP
-                img = image[self.y0:self.y1, self.x0:self.x1]
-                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)   
-                text = pytesseract.image_to_string(gray, config='-l eng+pol --psm 6')
-                self.clicked = False
-                if text:
-                    cv2.destroyAllWindows()
-                    return text  
-
-            # Wait for key, if q is pressed then close the window
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-
-        cv2.destroyAllWindows()
-        return None
+        except Exception as e:
+            messagebox.showerror("Error", e) 
+            return None

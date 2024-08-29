@@ -6,7 +6,6 @@ import textInterceptor as ti
 from tkinter import messagebox 
 from tkinter.ttk import *
 from tkinter import *
-import threading
 
 # Tesseract OCR
 pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files/Tesseract-OCR/tesseract.exe'
@@ -25,13 +24,13 @@ def preProcessImage(image):
 def isTable(contours, minContours=4, minCellArea=20):
 
     if len(contours) < minContours:
-        print("Contours < 4")
+        # print("Contours < 4")
         return False
 
     cellAreas = [cv2.contourArea(c) for c in contours if cv2.contourArea(c) > minCellArea]
     
     if len(cellAreas) < minContours:
-        print("len(cellAreas) < minContours")
+        # print("len(cellAreas) < minContours")
         return False
 
     return True
@@ -67,9 +66,9 @@ def detectTableStructure(image):
 
     # Finding all rectangles in contours
     for contour in contours:
-        length = cv2.arcLength(contour, True) #Calculate perimeter of contour
-        approx = cv2.approxPolyDP(contour, 0.02 * length, True) #approxPolyDP simplifies the shape of contour
-        #If approx has 4 vertices then approx is possible rectangle
+        length = cv2.arcLength(contour, True) # Calculate perimeter of contour
+        approx = cv2.approxPolyDP(contour, 0.02 * length, True) # approxPolyDP simplifies the shape of contour
+        # If approx has 4 vertices then approx is possible rectangle
         if len(approx) == 4:
             rectangles.append(approx)
 
@@ -95,21 +94,25 @@ def detectTableStructure(image):
 class TableExtractor:
     # Table extraction, reading text from cells and saving it in DataFrame
     def extractTable(self, inputPath):
-        image = cv2.imread(inputPath)
-        if image is None:
-            messagebox.showerror("Result.", f"Loading file error: {inputPath}") 
-            return
+        try: 
+            image = cv2.imread(inputPath)
+            if image is None:
+                messagebox.showerror("Result.", f"Loading file error: {inputPath}") 
+                return
 
-        isTable, contours, image = detectTableStructure(image)
+            isTable, contours, image = detectTableStructure(image)
+            
+            if isTable:
+                messagebox.showinfo("Result.", "Table is detected.") 
+                df = self.savingTable(contours, image)
+                if df is not None:
+                    return df
+                
+            return None
         
-        if isTable:
-            messagebox.showinfo("Result.", "Table is detected.") 
-            df = self.savingTable(contours, image)
-            if df is not None:
-                return df
-        else:
-            messagebox.showinfo("Result.", "Image without table.") 
-        return None
+        except Exception as e:
+            messagebox.showerror("Error", e) 
+            return None
     
     # Function takes single cell from table, detects text and put it into DataFrame 
     def savingTable(self, contours, image):
@@ -137,4 +140,5 @@ class TableExtractor:
         messagebox.showinfo("Result.", "Conversion completed.")
         if df is not None:
             return df
+        
         return None
