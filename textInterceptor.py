@@ -6,11 +6,12 @@ import tableExtractor
 import textExtractor
 import os
 import datetime
+import json
 
 # Main window configuration
 def setMainWindow():
     mainWindow = Tk()
-    mainWindow.geometry('400x300')
+    mainWindow.geometry('400x340')
     mainWindow.title("Text Interceptor 1.0")
     mainWindow.resizable(False,False)
     return mainWindow
@@ -32,6 +33,31 @@ def setCheckbutton(window, iText, intvar):
     checkbutton = ttk.Checkbutton(window, text = iText, 
                     variable = intvar, onvalue = 1, offvalue = 0).pack(pady=10)
     return checkbutton
+
+# Class for current application settings
+class Settings:
+    def __init__(self):
+        self.settingsPath = r"" + os.getcwd() + "\\settings.json"
+        self.jsonSettings = ""
+
+        # print(self.settingsPath)
+
+        with open(self.settingsPath) as jsonFile:
+            self.jsonSettings = json.load(jsonFile)
+        
+        self.generateReports = int(self.jsonSettings["generateReports"])
+        self.langPol = int(self.jsonSettings["langPol"])
+
+# Link window configuration
+def showLinkFromQR(link):
+    linkWindow = Tk()
+    linkWindow.geometry('380x40')
+    linkWindow.title("Link from QR")
+    linkWindow.resizable(False,False)
+    textWidget = Text(linkWindow, height=30, width=50)
+    textWidget.pack()
+    textWidget.insert(INSERT, link)  
+    return linkWindow
 
 # ReportInfo class maintains data about image to text conversion (filename, conversion date, number of words, 5 most common words in text)
 class ReportInfo:
@@ -64,7 +90,7 @@ class ReportInfo:
     # Report generating
     def generateReport(self):
         reportWindow = Tk()
-        reportWindow.geometry('380x140')
+        reportWindow.geometry('380x180')
         reportWindow.title(f"Report of {self.filename}")
         reportWindow.resizable(False,False)
         textWidget = Text(reportWindow, height=50, width=50)
@@ -82,10 +108,13 @@ class TextInterceptor:
     def __init__(self):
         self.textExtractor = textExtractor.TextExtractor()
         self.tableExtractor = tableExtractor.TableExtractor()
+        self.settings = Settings()
 
         self.mainWindow = setMainWindow()
+        self.CheckbuttonReports = IntVar()
+        self.CheckbuttonLangPol = IntVar()
 
-        self.Checkbutton1 = IntVar()
+        self.readSettings()
 
         self.tabControl = ttk.Notebook(self.mainWindow)
         self.mainPage = ttk.Frame(self.tabControl) 
@@ -99,13 +128,35 @@ class TextInterceptor:
         setButton(self.mainPage, self.extractTextFromImage, "Extract text from image")
         setButton(self.mainPage, self.extractTextFromVideo, "Extract text from video")
         setButton(self.mainPage, self.extractTableFromImage, "Extract table from image")
+        setButton(self.mainPage, self.extractQRCodeFromImage, "Read QR code")
         setButton(self.mainPage, self.mainWindow.destroy, "Quit")
 
         # Options page
         setTitleLabel(self.optionsPage, "Options")
-        setCheckbutton(self.optionsPage, "Generate report after text conversion", self.Checkbutton1)
+        setCheckbutton(self.optionsPage, "Generate report after text conversion", self.CheckbuttonReports)
+        setCheckbutton(self.optionsPage, "OCR works with Polish", self.CheckbuttonLangPol)
+        setButton(self.optionsPage, self.saveSettings, "Save settings")
         setButton(self.optionsPage, self.mainWindow.destroy, "Quit")
+
         self.mainWindow.mainloop()
+
+    # Read settings from Settings class
+    def readSettings(self):
+        self.CheckbuttonReports = IntVar(value=self.settings.generateReports)
+        self.CheckbuttonLangPol = IntVar(value=self.settings.langPol)
+
+    # Save current application settings
+    def saveSettings(self):
+        generateReports = self.CheckbuttonReports
+        langPol = self.CheckbuttonLangPol
+
+        settings = {
+            "generateReports" : str(generateReports.get()),
+            "langPol" : str(langPol.get())
+        }
+
+        with open(self.settings.settingsPath, 'w') as jsonFile:
+            json.dump(settings, jsonFile)
 
     def extractTableFromImage(self):
         try:
@@ -138,7 +189,7 @@ class TextInterceptor:
                 messagebox.showwarning("Warning", "Incorrect file type.")
                 return
 
-            text = self.textExtractor.extractText(filepath)
+            text = self.textExtractor.extract(filepath, "extractText")
             if text is not None:
                 self.saveText(text)
             else:
@@ -158,6 +209,31 @@ class TextInterceptor:
         except Exception as e:
             messagebox.showerror("Error", e) 
 
+
+    # Function to implement
+    def extractQRCodeFromImage(self):
+        try:
+            filepath = filedialog.askopenfilename(title="Open image")
+            if filepath == "":
+                return
+            if not filepath.endswith(('.png', '.jpg', '.jpeg')):
+                messagebox.showwarning("Warning", "Incorrect file type.")
+                return
+            
+            link = self.textExtractor.extract(filepath, "extractQRCode")
+            if link is not None:
+                linkWindow = showLinkFromQR(link)
+                linkWindow.mainloop()
+            else:
+                messagebox.showwarning("Warning", "No text found in the image.")
+
+        except FileNotFoundError as e:
+            messagebox.showerror("Error", e) 
+        except IOError as e:
+            messagebox.showerror("Error", e) 
+        except Exception as e:
+            messagebox.showerror("Error", e) 
+
     def saveText(self, text):
         try:
             filepath = filedialog.asksaveasfilename(title="Save converted text", defaultextension=".txt", filetypes=[("Txt files", ".txt")])
@@ -169,7 +245,7 @@ class TextInterceptor:
             
             with open(filepath, 'w+') as file:
                 file.write(text)
-                if self.Checkbutton1.get() == 1:
+                if self.CheckbuttonReports.get() == 1:
                     report = ReportInfo(filepath, text)
                     # print(report.filename, report.datetime, report.wordsCount, report.mostCommonWordsCount)
                     report.generateReport()

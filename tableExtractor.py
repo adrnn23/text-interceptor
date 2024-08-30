@@ -1,14 +1,33 @@
-import pytesseract
-import numpy as np
 import cv2
 import pandas as pd
-import textInterceptor as ti
 from tkinter import messagebox 
 from tkinter.ttk import *
 from tkinter import *
+import pytesseract
+import json
+import os
 
-# Tesseract OCR
 pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files/Tesseract-OCR/tesseract.exe'
+
+# Return lang settings from settings.json
+def returnLang():
+    settingsPath = r"" + os.getcwd() + "\\settings.json"
+    jsonSettings = ""
+
+    with open(settingsPath) as jsonFile:
+        jsonSettings = json.load(jsonFile)
+
+    langPol = int(jsonSettings["langPol"])
+
+    if(langPol == 1):
+        lang = 'eng+pol'
+    else:
+        lang = 'eng'
+    return lang
+
+def imageToString(cell):
+    langFromJson = returnLang()
+    return pytesseract.image_to_string(cell, lang = langFromJson, config='--psm 6')
 
 # Rgb to grayscale 
 def convertToGrayscale(image):
@@ -121,7 +140,7 @@ class TableExtractor:
             x, y, w, h = cv2.boundingRect(contours[i])
             if w > 10 and h > 10:
                 cell = image[y:y+h, x:x+w]
-                text = pytesseract.image_to_string(cell, config='-l eng+pol --psm 6')
+                text = imageToString(cell)
                 data.append((y, x, text.strip()))
 
         # Adding cells to table 
