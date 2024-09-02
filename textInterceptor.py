@@ -7,6 +7,8 @@ import textExtractor
 import os
 import datetime
 import json
+from fpdf import FPDF
+import informationExtractor
 
 # Main window configuration
 def setMainWindow():
@@ -16,23 +18,41 @@ def setMainWindow():
     mainWindow.resizable(False,False)
     return mainWindow
 
-# Label configuration
-def setTitleLabel(window, text):
+# Title label configuration
+def setTitleLabel(window, iText):
     title = StringVar()
-    title.set(text)
+    title.set(iText)
     label = Label(window, textvariable=title, justify=CENTER, font=("Arial, 16"))
+    label.pack(pady=10)
+    return label
+
+# Label configuration
+def setTextLabel(window, iText):
+    text = StringVar()
+    text.set(iText)
+    label = Label(window, textvariable=text, justify=CENTER, font=("Arial, 10"))
     label.pack(pady=10)
     return label
 
 # Button configuration
 def setButton(window, iCommand, iText):
-    return ttk.Button(window, text=iText,command=iCommand, width=30, cursor="hand2").pack(pady=10)
+    return ttk.Button(window, text=iText,command=iCommand, width=30, cursor="hand2").pack(pady=8)
     
 # Checkbutton configuration
 def setCheckbutton(window, iText, intvar):
     checkbutton = ttk.Checkbutton(window, text = iText, 
-                    variable = intvar, onvalue = 1, offvalue = 0).pack(pady=10)
+                    variable = intvar, onvalue = 1, offvalue = 0).pack(pady=8)
     return checkbutton
+
+# Radiobutton configuration
+def setRadiobutton(window, intvar):
+    filetypes = {
+        "TXT" : "1", 
+        "PDF" : "2", 
+        } 
+    
+    for (filetype, value) in filetypes.items(): 
+        Radiobutton(window, text = filetype, variable = intvar, value = value).pack() 
 
 # Class for current application settings
 class Settings:
@@ -47,6 +67,7 @@ class Settings:
         
         self.generateReports = int(self.jsonSettings["generateReports"])
         self.langPol = int(self.jsonSettings["langPol"])
+        self.filetype = int(self.jsonSettings["filetype"])
 
 # Link window configuration
 def showLinkFromQR(link):
@@ -108,11 +129,13 @@ class TextInterceptor:
     def __init__(self):
         self.textExtractor = textExtractor.TextExtractor()
         self.tableExtractor = tableExtractor.TableExtractor()
+        self.informationExtractor = informationExtractor.InformationExtractor()
         self.settings = Settings()
 
         self.mainWindow = setMainWindow()
         self.CheckbuttonReports = IntVar()
         self.CheckbuttonLangPol = IntVar()
+        self.RadiobuttonFiletype = IntVar()
 
         self.readSettings()
 
@@ -128,6 +151,7 @@ class TextInterceptor:
         setButton(self.mainPage, self.extractTextFromImage, "Extract text from image")
         setButton(self.mainPage, self.extractTextFromVideo, "Extract text from video")
         setButton(self.mainPage, self.extractTableFromImage, "Extract table from image")
+        setButton(self.mainPage, self.extractInformation, "Extract information from text")
         setButton(self.mainPage, self.extractQRCodeFromImage, "Read QR code")
         setButton(self.mainPage, self.mainWindow.destroy, "Quit")
 
@@ -135,28 +159,46 @@ class TextInterceptor:
         setTitleLabel(self.optionsPage, "Options")
         setCheckbutton(self.optionsPage, "Generate report after text conversion", self.CheckbuttonReports)
         setCheckbutton(self.optionsPage, "OCR works with Polish", self.CheckbuttonLangPol)
-        setButton(self.optionsPage, self.saveSettings, "Save settings")
-        setButton(self.optionsPage, self.mainWindow.destroy, "Quit")
 
+        setTextLabel(self.optionsPage, "Save converted text as:")
+        setRadiobutton(self.optionsPage, self.RadiobuttonFiletype)
+        setButton(self.optionsPage, self.saveSettings, "Save settings")
         self.mainWindow.mainloop()
 
     # Read settings from Settings class
     def readSettings(self):
         self.CheckbuttonReports = IntVar(value=self.settings.generateReports)
         self.CheckbuttonLangPol = IntVar(value=self.settings.langPol)
+        self.RadiobuttonFiletype = IntVar(value=self.settings.filetype)
 
     # Save current application settings
     def saveSettings(self):
-        generateReports = self.CheckbuttonReports
-        langPol = self.CheckbuttonLangPol
-
         settings = {
-            "generateReports" : str(generateReports.get()),
-            "langPol" : str(langPol.get())
+            "generateReports" : str(self.CheckbuttonReports.get()),
+            "langPol" : str(self.CheckbuttonLangPol.get()),
+            "filetype" : str(self.RadiobuttonFiletype.get()) 
         }
 
         with open(self.settings.settingsPath, 'w') as jsonFile:
             json.dump(settings, jsonFile)
+
+    def extractInformation(self):
+        try:
+            filepath = filedialog.askopenfilename(title="Open file", filetypes=(("Text files", "*.txt"),("PDF files", "*.pdf")))
+            if filepath == "":
+                return
+            if not filepath.endswith(('.txt', '.pdf')):
+                messagebox.showwarning("Warning", "Incorrect file type.")
+                return
+            if filepath:
+                self.informationExtractor.getInformation(filepath)
+
+        except FileNotFoundError as e:
+            messagebox.showerror("Error", e) 
+        except IOError as e:
+            messagebox.showerror("Error", e) 
+        except Exception as e:
+            messagebox.showerror("Error", e) 
 
     def extractTableFromImage(self):
         try:
@@ -235,8 +277,24 @@ class TextInterceptor:
             messagebox.showerror("Error", e) 
 
     def saveText(self, text):
+        settingsPath = r"" + os.getcwd() + "\\settings.json"
+        jsonSettings = ""
+
+        with open(settingsPath) as jsonFile:
+            jsonSettings = json.load(jsonFile)
+
+        filetype = int(jsonSettings["filetype"])
+
+        if(filetype == 1):
+            self.saveToTxtFile(text)
+        elif(filetype == 2):
+            self.saveToPdfFile(text)
+        else:
+            messagebox.showwarning("Warning", "Incorrect file type.")
+
+    def saveToTxtFile(self, text):
         try:
-            filepath = filedialog.asksaveasfilename(title="Save converted text", defaultextension=".txt", filetypes=[("Txt files", ".txt")])
+            filepath = filedialog.asksaveasfilename(title="Save converted text", defaultextension=".txt", filetypes=[("TXT files", ".txt")])
             if filepath == "":
                 return
             if not filepath.endswith(".txt"):
@@ -245,6 +303,32 @@ class TextInterceptor:
             
             with open(filepath, 'w+') as file:
                 file.write(text)
+                if self.CheckbuttonReports.get() == 1:
+                    report = ReportInfo(filepath, text)
+                    # print(report.filename, report.datetime, report.wordsCount, report.mostCommonWordsCount)
+                    report.generateReport()
+
+        except IOError as e:
+            messagebox.showerror("Error", e) 
+        except Exception as e:
+            messagebox.showerror("Error", e) 
+
+    def saveToPdfFile(self, text):
+        try:
+            filepath = filedialog.asksaveasfilename(title="Save converted text", defaultextension=".pdf", filetypes=[("PDF files", ".pdf")])
+            if filepath == "":
+                return
+            if not filepath.endswith(".pdf"):
+                messagebox.showwarning("Warning", "Incorrect file type.")
+                return
+            
+            if filepath:
+                pdf = FPDF()
+                pdf.add_font('DejaVu', '', r"" + os.getcwd() + "\\dejavu-sans\\ttf\\DejaVuSansCondensed.ttf", uni=True)
+                pdf.set_font('DejaVu', '', 10)
+                pdf.add_page()
+                pdf.multi_cell(0, 4, text)
+                pdf.output(filepath)
                 if self.CheckbuttonReports.get() == 1:
                     report = ReportInfo(filepath, text)
                     # print(report.filename, report.datetime, report.wordsCount, report.mostCommonWordsCount)
