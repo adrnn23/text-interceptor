@@ -5,7 +5,6 @@ import spacy
 
 class InformationExtractor:
     def __init__(self):
-        self.nlp_pl = spacy.load("pl_core_news_sm")
         self.nlp_en = spacy.load("en_core_web_sm")
 
     def findPhoneNumbers(self, text):
@@ -18,19 +17,8 @@ class InformationExtractor:
         pattern = r'\b(?:\d{1,2}[-/.\s]\d{1,2}[-/.\s]\d{2,4}|\d{4}[-/.\s]\d{1,2}[-/.\s]\d{1,2})\b'
         dates = re.findall(pattern, text)
         return dates
-    
-    def findNamedEntitiesPL(self, text):
-        return self.findNamedEntities(text, self.nlp_pl)
 
-    def findNamedEntitiesEN(self, text):
-        return self.findNamedEntities(text, self.nlp_en)
-
-    def findNamedEntities(self, text, nlp_model):
-        doc = nlp_model(text)
-        persons = [ent.text for ent in doc.ents if ent.label_ == "PERSON"]
-        return persons
-
-    def displayResults(self, numbers, dates, persons):
+    def displayResults(self, numbers, dates):
         result = ""
 
         if numbers:
@@ -43,11 +31,6 @@ class InformationExtractor:
         else:
             result += "No dates found.\n\n"
 
-        if persons:
-            result += "Found names:\n" + "\n".join(persons) + "\n\n"
-        else:
-            result += "No names found.\n\n"
-
         messagebox.showinfo("Search Results", result)
 
 
@@ -57,10 +40,7 @@ class InformationExtractor:
                 text = file.read()
             numbers = self.findPhoneNumbers(text)
             dates = self.findDates(text)
-            personsPl = self.findNamedEntitiesPL(text)
-            personsEn = self.findNamedEntitiesEN(text)
-            persons = list(set(personsPl))+list(set(personsEn))
-            self.displayResults(numbers, dates, persons)
+            self.displayResults(numbers, dates)
 
         except Exception as e:
             messagebox.showerror("Error", str(e))
