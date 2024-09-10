@@ -18,9 +18,9 @@ import pyperclip
 # Main window configuration
 def setMainWindow():
     mainWindow = Tk()
-    mainWindow.geometry('500x400')
+    mainWindow.geometry('700x400')
     mainWindow.title("Text Interceptor 1.0")
-    mainWindow.resizable(False,False)
+    mainWindow.resizable(True,True)
     return mainWindow
 
 # Title label configuration
@@ -103,12 +103,13 @@ class ReportInfo:
         self.filename = os.path.split(iFilepath)[1]
         self.datetime = datetime.datetime.now()
         self.wordsCount = len(iText.split())
+        self.charsCount = len(iText)
         self.mostCommonWordsCount = self.mostCommonWords(iText)
 
     # Report generating
     def generateReport(self):
         reportWindow = Tk()
-        reportWindow.geometry('380x180')
+        reportWindow.geometry('380x260')
         reportWindow.title(f"Report of {self.filename}")
         reportWindow.resizable(False,False)
         textWidget = Text(reportWindow, height=50, width=50)
@@ -118,7 +119,7 @@ class ReportInfo:
         for word in self.mostCommonWordsCount:
             wordsWithNumbers += str(word[1]) + "(" + str(word[0]) + ")" + "\n"
 
-        textWidget.insert(INSERT, f"Filename: {self.filename} \nDatetime: {str(self.datetime)[:-7]} \nWords: {self.wordsCount} \nThe most common words: {wordsWithNumbers}")  
+        textWidget.insert(INSERT, f"Filename: {self.filename} \nDatetime: {str(self.datetime)[:-7]} \nWords: {self.wordsCount} \nNumber of chars: {self.charsCount} \nThe most common words: {wordsWithNumbers}")  
         reportWindow.mainloop()
 
 # Link window configuration
@@ -151,6 +152,7 @@ class TextInterceptor:
         self.createMainPage()
         self.createOtherPage()
         self.createOptionsPage()
+        self.createHelpPage()
 
         self.mainWindow.mainloop()
 
@@ -164,10 +166,13 @@ class TextInterceptor:
         self.mainPage = ttk.Frame(self.tabControl)
         self.otherPage = ttk.Frame(self.tabControl)
         self.optionsPage = ttk.Frame(self.tabControl)
+        self.helpPage = ttk.Frame(self.tabControl)
+
 
         self.tabControl.add(self.mainPage, text='Main')
         self.tabControl.add(self.otherPage, text='Other')
         self.tabControl.add(self.optionsPage, text='Options')
+        self.tabControl.add(self.helpPage, text='Help')
         self.tabControl.pack(expand=1, fill="both")
 
     def createMainPage(self):
@@ -192,6 +197,17 @@ class TextInterceptor:
         setRadiobutton(self.optionsPage, self.RadiobuttonFiletype)
         setButton(self.optionsPage, self.saveSettings, "Save settings")
 
+    def createHelpPage(self):
+        setTitleLabel(self.helpPage, "Help")
+        helpDescription = "1. To close the window displaying the image, press Q. \n" 
+        helpDescription += "2. Extract text from screenshot - screenshot is taken with the press \nof a button and allows the user to cut out fragment of the image. \n"
+        helpDescription += "3. Extract information uses txt files to analyze and get information. \n"
+        helpDescription += "4. Rest of functions takes image file as a source. \n"
+        helpDescription += "5. Read QR code - give an image of QR code and obtain link to website. \n"
+        helpDescription += "6. After changing the settings, you must save settings to use them in program."
+        textWidget = Text(self.helpPage, height=800, width=400)
+        textWidget.pack()
+        textWidget.insert(INSERT, helpDescription )
 
     # Read settings from Settings class
     def readSettings(self):
@@ -244,7 +260,7 @@ class TextInterceptor:
             messagebox.showerror("Error", e) 
 
     def extractInformation(self):
-        filepath = self.openFile("Open file", [("Text files", ('.txt')),("PDF files", ('.pdf'))])
+        filepath = self.openFile("Open file", [("Text files", ('.txt'))])
         if filepath:
             self.informationExtractor.getInformation(filepath)
 
@@ -320,9 +336,9 @@ class TextInterceptor:
             
             with open(filepath, 'w+') as file:
                 file.write(text)
-                if self.CheckbuttonReports.get() == 1:
-                    report = ReportInfo(filepath, text)
-                    report.generateReport()
+            if self.CheckbuttonReports.get() == 1:
+                report = ReportInfo(filepath, text)
+                report.generateReport()
 
         except IOError as e:
             messagebox.showerror("Error", e) 
@@ -331,13 +347,7 @@ class TextInterceptor:
 
     def saveToPdfFile(self, text):
         try:
-            filepath = filedialog.asksaveasfilename(title="Save converted text", defaultextension=".pdf", filetypes=[("PDF files", ".pdf")])
-            if filepath == "":
-                return
-            if not filepath.endswith(".pdf"):
-                messagebox.showwarning("Warning", "Incorrect file type.")
-                return
-            
+            filepath = filedialog.asksaveasfilename(title="Save converted text", defaultextension=".pdf", filetypes=[("PDF files", ".pdf")]) 
             if filepath:
                 pdf = FPDF()
                 pdf.add_font('DejaVu', '', r"" + os.getcwd() + "\\dejavu-sans\\ttf\\DejaVuSansCondensed.ttf", uni=True)
@@ -345,9 +355,9 @@ class TextInterceptor:
                 pdf.add_page()
                 pdf.multi_cell(0, 4, text)
                 pdf.output(filepath)
-                if self.CheckbuttonReports.get() == 1:
-                    report = ReportInfo(filepath, text)
-                    report.generateReport()
+            if self.CheckbuttonReports.get() == 1:
+                report = ReportInfo(filepath, text)
+                report.generateReport()
 
         except IOError as e:
             messagebox.showerror("Error", e) 
