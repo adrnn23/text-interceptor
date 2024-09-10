@@ -9,11 +9,16 @@ import datetime
 import json
 from fpdf import FPDF
 import informationExtractor
+import pyautogui
+import cv2
+import numpy as np
+import time
+import pyperclip
 
 # Main window configuration
 def setMainWindow():
     mainWindow = Tk()
-    mainWindow.geometry('400x340')
+    mainWindow.geometry('500x400')
     mainWindow.title("Text Interceptor 1.0")
     mainWindow.resizable(False,False)
     return mainWindow
@@ -57,28 +62,20 @@ def setRadiobutton(window, intvar):
 # Class for current application settings
 class Settings:
     def __init__(self):
-        self.settingsPath = r"" + os.getcwd() + "\\settings.json"
+        self.settingsPath =  r"" + os.getcwd() + "\\settings.json"
         self.jsonSettings = ""
 
-        # print(self.settingsPath)
+        try:
+            with open(self.settingsPath) as jsonFile:
+                self.jsonSettings = json.load(jsonFile)
+            
+            self.generateReports = int(self.jsonSettings["generateReports"])
+            self.langPol = int(self.jsonSettings["langPol"])
+            self.filetype = int(self.jsonSettings["filetype"])
 
-        with open(self.settingsPath) as jsonFile:
-            self.jsonSettings = json.load(jsonFile)
-        
-        self.generateReports = int(self.jsonSettings["generateReports"])
-        self.langPol = int(self.jsonSettings["langPol"])
-        self.filetype = int(self.jsonSettings["filetype"])
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            messagebox.showerror("Error", e)
 
-# Link window configuration
-def showLinkFromQR(link):
-    linkWindow = Tk()
-    linkWindow.geometry('380x40')
-    linkWindow.title("Link from QR")
-    linkWindow.resizable(False,False)
-    textWidget = Text(linkWindow, height=30, width=50)
-    textWidget.pack()
-    textWidget.insert(INSERT, link)  
-    return linkWindow
 
 # ReportInfo class maintains data about image to text conversion (filename, conversion date, number of words, 5 most common words in text)
 class ReportInfo:
@@ -124,6 +121,19 @@ class ReportInfo:
         textWidget.insert(INSERT, f"Filename: {self.filename} \nDatetime: {str(self.datetime)[:-7]} \nWords: {self.wordsCount} \nThe most common words: {wordsWithNumbers}")  
         reportWindow.mainloop()
 
+# Link window configuration
+def showLinkFromQR(link):
+    linkWindow = Tk()
+    linkWindow.geometry('380x40')
+    linkWindow.title("Link from QR")
+    linkWindow.resizable(False,False)
+    textWidget = Text(linkWindow, height=30, width=50)
+    textWidget.pack()
+    textWidget.insert(INSERT, link)
+    pyperclip.copy(str(link))
+    return linkWindow
+
+
 # Main class TextInterceptor 
 class TextInterceptor:
     def __init__(self):
@@ -133,37 +143,55 @@ class TextInterceptor:
         self.settings = Settings()
 
         self.mainWindow = setMainWindow()
-        self.CheckbuttonReports = IntVar()
-        self.CheckbuttonLangPol = IntVar()
-        self.RadiobuttonFiletype = IntVar()
-
+        self.initVariables()
         self.readSettings()
+        self.screenshot = []
 
+        self.createTabs()
+        self.createMainPage()
+        self.createOtherPage()
+        self.createOptionsPage()
+
+        self.mainWindow.mainloop()
+
+    def initVariables(self):
+        self.CheckbuttonReports = IntVar(value=self.settings.generateReports)
+        self.CheckbuttonLangPol = IntVar(value=self.settings.langPol)
+        self.RadiobuttonFiletype = IntVar(value=self.settings.filetype)
+
+    def createTabs(self):
         self.tabControl = ttk.Notebook(self.mainWindow)
-        self.mainPage = ttk.Frame(self.tabControl) 
-        self.optionsPage = ttk.Frame(self.tabControl) 
-        self.tabControl.add(self.mainPage, text='Main') 
-        self.tabControl.add(self.optionsPage, text='Options') 
-        self.tabControl.pack(expand=1, fill="both") 
+        self.mainPage = ttk.Frame(self.tabControl)
+        self.otherPage = ttk.Frame(self.tabControl)
+        self.optionsPage = ttk.Frame(self.tabControl)
 
-        # Text interceptor main page
+        self.tabControl.add(self.mainPage, text='Main')
+        self.tabControl.add(self.otherPage, text='Other')
+        self.tabControl.add(self.optionsPage, text='Options')
+        self.tabControl.pack(expand=1, fill="both")
+
+    def createMainPage(self):
         setTitleLabel(self.mainPage, "Text Interceptor 1.0")
+        setButton(self.mainPage, self.extractTextFromScreenshot, "Extract text from screenshot")
         setButton(self.mainPage, self.extractTextFromImage, "Extract text from image")
         setButton(self.mainPage, self.extractTextFromVideo, "Extract text from video")
         setButton(self.mainPage, self.extractTableFromImage, "Extract table from image")
-        setButton(self.mainPage, self.extractInformation, "Extract information from text")
-        setButton(self.mainPage, self.extractQRCodeFromImage, "Read QR code")
         setButton(self.mainPage, self.mainWindow.destroy, "Quit")
 
-        # Options page
+    def createOtherPage(self):
+        setTitleLabel(self.otherPage, "Other functionalities")
+        setButton(self.otherPage, self.extractInformation, "Extract information from text")
+        setButton(self.otherPage, self.extractQRCodeFromImage, "Read QR code")
+        setButton(self.otherPage, self.mainWindow.destroy, "Quit")
+
+    def createOptionsPage(self):
         setTitleLabel(self.optionsPage, "Options")
         setCheckbutton(self.optionsPage, "Generate report after text conversion", self.CheckbuttonReports)
         setCheckbutton(self.optionsPage, "OCR works with Polish", self.CheckbuttonLangPol)
-
         setTextLabel(self.optionsPage, "Save converted text as:")
         setRadiobutton(self.optionsPage, self.RadiobuttonFiletype)
         setButton(self.optionsPage, self.saveSettings, "Save settings")
-        self.mainWindow.mainloop()
+
 
     # Read settings from Settings class
     def readSettings(self):
@@ -182,67 +210,65 @@ class TextInterceptor:
         with open(self.settings.settingsPath, 'w') as jsonFile:
             json.dump(settings, jsonFile)
 
-    def extractInformation(self):
+    def openFile(self, title, filetypes):
         try:
-            filepath = filedialog.askopenfilename(title="Open file", filetypes=(("Text files", "*.txt"),("PDF files", "*.pdf")))
-            if filepath == "":
-                return
-            if not filepath.endswith(('.txt', '.pdf')):
-                messagebox.showwarning("Warning", "Incorrect file type.")
-                return
-            if filepath:
-                self.informationExtractor.getInformation(filepath)
+            filepath = filedialog.askopenfilename(title=title, filetypes=filetypes)
+            if not filepath:
+                return None
+            for filetype in filetypes:
+                if filepath.endswith(filetype[1]):
+                    return filepath
+            messagebox.showwarning("Warning", "Incorrect file type.")
+            return None
+        except Exception as e:
+            messagebox.showerror("Error", e)
+            return None
 
-        except FileNotFoundError as e:
-            messagebox.showerror("Error", e) 
-        except IOError as e:
-            messagebox.showerror("Error", e) 
+    def extractTextFromScreenshot(self):
+        try:
+            self.mainWindow.wm_iconify()
+            time.sleep(0.5)
+            self.screenshot = pyautogui.screenshot()
+            screenshot_np = np.array(self.screenshot)
+
+            # Color conversion from RGB TO BGR
+            screenshot = cv2.cvtColor(screenshot_np, cv2.COLOR_RGB2BGR)
+            text = self.textExtractor.extract(screenshot, 'extractText')
+                
+            if text:
+                self.saveText(text)
+            else:
+                messagebox.showwarning("Warning", "No text found in the screenshot.")
+
         except Exception as e:
             messagebox.showerror("Error", e) 
 
+    def extractInformation(self):
+        filepath = self.openFile("Open file", [("Text files", ('.txt')),("PDF files", ('.pdf'))])
+        if filepath:
+            self.informationExtractor.getInformation(filepath)
+
     def extractTableFromImage(self):
-        try:
-            filepath = filedialog.askopenfilename(title="Open image")
-            if filepath == "":
-                return
-            if not filepath.endswith(('.png', '.jpg', '.jpeg')):
-                messagebox.showwarning("Warning", "Incorrect file type.")
-                return
-            
+        filepath = self.openFile("Open image", [("Image files", ('.png', '.jpg', '.jpeg'))])
+        if filepath:   
             df = self.tableExtractor.extractTable(filepath)
             if df is not None:
                 self.saveTable(df)
             else:
                 messagebox.showwarning("Warning", "No table found in the image.")
 
-        except FileNotFoundError as e:
-            messagebox.showerror("Error", e) 
-        except IOError as e:
-            messagebox.showerror("Error", e) 
-        except Exception as e:
-            messagebox.showerror("Error", e) 
-
     def extractTextFromImage(self):
-        try:
-            filepath = filedialog.askopenfilename(title="Open image")
-            if filepath == "":
-                return
-            if not filepath.endswith(('.png', '.jpg', '.jpeg')):
-                messagebox.showwarning("Warning", "Incorrect file type.")
-                return
-
-            text = self.textExtractor.extract(filepath, "extractText")
-            if text is not None:
+        filepath = self.openFile("Open image", [("Image files", ('.png', '.jpg', '.jpeg'))])
+        if filepath:
+            image = cv2.imread(filepath)
+            if image is None:
+                messagebox.showerror("Error", f"Loading file error: {filepath}")
+                return  
+            text = self.textExtractor.extract(image, "extractText")
+            if text:
                 self.saveText(text)
             else:
                 messagebox.showwarning("Warning", "No text found in the image.")
-
-        except FileNotFoundError as e:
-            messagebox.showerror("Error", e) 
-        except IOError as e:
-            messagebox.showerror("Error", e) 
-        except Exception as e:
-            messagebox.showerror("Error", e) 
 
     # Function to implement
     def extractTextFromVideo(self):
@@ -254,27 +280,18 @@ class TextInterceptor:
 
     # Function to implement
     def extractQRCodeFromImage(self):
-        try:
-            filepath = filedialog.askopenfilename(title="Open image")
-            if filepath == "":
-                return
-            if not filepath.endswith(('.png', '.jpg', '.jpeg')):
-                messagebox.showwarning("Warning", "Incorrect file type.")
-                return
-            
-            link = self.textExtractor.extract(filepath, "extractQRCode")
+        filepath = self.openFile("Open image", [("Image files", ('.png', '.jpg', '.jpeg'))])
+        if filepath:
+            image = cv2.imread(filepath)
+            if image is None:
+                messagebox.showerror("Error", f"Loading file error: {filepath}")
+                return  
+            link = self.textExtractor.extract(image, "extractQRCode")
             if link is not None:
                 linkWindow = showLinkFromQR(link)
                 linkWindow.mainloop()
             else:
                 messagebox.showwarning("Warning", "No text found in the image.")
-
-        except FileNotFoundError as e:
-            messagebox.showerror("Error", e) 
-        except IOError as e:
-            messagebox.showerror("Error", e) 
-        except Exception as e:
-            messagebox.showerror("Error", e) 
 
     def saveText(self, text):
         settingsPath = r"" + os.getcwd() + "\\settings.json"
@@ -305,7 +322,6 @@ class TextInterceptor:
                 file.write(text)
                 if self.CheckbuttonReports.get() == 1:
                     report = ReportInfo(filepath, text)
-                    # print(report.filename, report.datetime, report.wordsCount, report.mostCommonWordsCount)
                     report.generateReport()
 
         except IOError as e:
@@ -331,7 +347,6 @@ class TextInterceptor:
                 pdf.output(filepath)
                 if self.CheckbuttonReports.get() == 1:
                     report = ReportInfo(filepath, text)
-                    # print(report.filename, report.datetime, report.wordsCount, report.mostCommonWordsCount)
                     report.generateReport()
 
         except IOError as e:
@@ -344,7 +359,6 @@ class TextInterceptor:
             filepath = filedialog.asksaveasfilename(title="Save converted table", defaultextension=".xlsx", filetypes=[("Excel files", ".xlsx .xls"), ("CSV", ".csv")])
             if filepath == "":
                 return
-            
             if (filepath.endswith(".xlsx") or filepath.endswith(".xls")):
                 df.to_excel(filepath, index=False, header=False)
             elif filepath.endswith(".csv"):

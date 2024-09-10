@@ -26,7 +26,8 @@ def returnLang():
 
 def imageToString(cell):
     langFromJson = returnLang()
-    return pytesseract.image_to_string(cell, lang = langFromJson, config='--psm 6')
+    text =  pytesseract.image_to_string(cell, lang = langFromJson, config='--psm 6')
+    return text
 
 # Function used to resize image if it is too big to display
 def resizeImage(image):
@@ -35,24 +36,24 @@ def resizeImage(image):
     monitor = get_monitors()
     if(monitor[0].width==1920 and monitor[0].height==1080):
         # Optimal image size for 1920x1080
-        height = 812
-        width = 1524
+        imageHeight = 812
+        imageWidth = 1524
 
         if(image.shape[1] > 1524 and image.shape[0] < 812):
-            width = 1524
-            scaleRatio = width / image.shape[1]
-            height = int(image.shape[0]*scaleRatio)
+            imageWidth = 1524
+            scaleRatio = imageWidth / image.shape[1]
+            imageHeight = int(image.shape[0]*scaleRatio)
         elif(image.shape[1] < 1524 and image.shape[0] > 812):
-            height = 812
-            scaleRatio = height / image.shape[0]
-            width = int(image.shape[1]*scaleRatio)
+            imageHeight = 812
+            scaleRatio = imageHeight / image.shape[0]
+            imageWidth = int(image.shape[1]*scaleRatio)
         else:
-            height = 812
-            width = 1524
+            imageHeight = 812
+            imageWidth = 1524
         
         # print(image.shape[0], image.shape[1])
-        # print(height, width)
-        image = cv2.resize(image, (width, height))
+        # print(imageHeight, imageWidth)
+        image = cv2.resize(image, (imageWidth, imageHeight))
 
     return image
 
@@ -60,7 +61,6 @@ class TextExtractor:
     def __init__(self):
         self.x0, self.y0, self.x1, self.y1 = 1, 1, 1, 1
         self.clicked = False
-
     # Get mouse position at LBUTTONDOWN and LBUTTONUP
     def getMouseClickPosition(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
@@ -70,14 +70,9 @@ class TextExtractor:
             self.x1, self.y1 = x, y
             self.clicked = True
         
-    def extract(self, filepath, function):
+    def extract(self, img, function):
         try:
-            # Load the image
-            image = cv2.imread(filepath)
-            if image is None:
-                messagebox.showerror("Error", f"Loading file error: {filepath}")
-                return None
-
+            image = img
             # Resize the image if it is too big
             if image.shape[0] > 812 or image.shape[1] > 1524:
                 image = resizeImage(image)
