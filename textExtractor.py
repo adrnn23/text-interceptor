@@ -81,6 +81,8 @@ class TextExtractor:
             cv2.setMouseCallback('Image', self.getMouseClickPosition)
 
             while True:
+                if cv2.getWindowProperty("Image", cv2.WND_PROP_VISIBLE) == 0.0:
+                    break  # Window is closed or obscured, exit loop
                 if self.clicked:
                     croppedImage = self.cropImage(image)
                     gray = cv2.cvtColor(croppedImage, cv2.COLOR_BGR2GRAY)
