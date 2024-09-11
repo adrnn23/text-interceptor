@@ -18,7 +18,7 @@ import pyperclip
 # Main window configuration
 def setMainWindow():
     mainWindow = Tk()
-    mainWindow.geometry('700x400')
+    mainWindow.geometry('710x360')
     mainWindow.title("Text Interceptor 1.0")
     mainWindow.resizable(True,True)
     return mainWindow
@@ -199,13 +199,12 @@ class TextInterceptor:
 
     def createHelpPage(self):
         setTitleLabel(self.helpPage, "Help")
-        helpDescription = "1. To close the window displaying the image, press Q. \n" 
-        helpDescription += "2. Extract text from screenshot - screenshot is taken with the press \nof a button and allows the user to cut out fragment of the image. \n"
-        helpDescription += "3. Extract information uses txt files to analyze and get information. \n"
-        helpDescription += "4. Rest of functions takes image file as a source. \n"
-        helpDescription += "5. Read QR code - give an image of QR code and obtain link to website. \n"
-        helpDescription += "6. After changing the settings, you must save settings to use them in program."
-        textWidget = Text(self.helpPage, height=800, width=400)
+        helpDescription = "1. Extract text from screenshot - screenshot is taken with the press \nof a button and allows the user to cut out fragment of the image. \n"
+        helpDescription += "2. Extract information uses txt files to analyze and get information. \n"
+        helpDescription += "3. Rest of functions takes image file as a source. \n"
+        helpDescription += "4. Read QR code - give an image of QR code and obtain link to website. \n"
+        helpDescription += "5. After changing the settings, you must save settings to use them in program."
+        textWidget = Text(self.helpPage, height=700, width=400)
         textWidget.pack()
         textWidget.insert(INSERT, helpDescription )
 
@@ -265,7 +264,7 @@ class TextInterceptor:
             self.informationExtractor.getInformation(filepath)
 
     def extractTableFromImage(self):
-        filepath = self.openFile("Open image", [("Image files", ('.png', '.jpg', '.jpeg'))])
+        filepath = self.openFile("Open image", [("Image files", ('.JPEG','.JPG','.PNG', '.png', '.jpg', '.jpeg'))])
         if filepath:   
             df = self.tableExtractor.extractTable(filepath)
             if df is not None:
@@ -274,7 +273,7 @@ class TextInterceptor:
                 messagebox.showwarning("Warning", "No table found in the image.")
 
     def extractTextFromImage(self):
-        filepath = self.openFile("Open image", [("Image files", ('.png', '.jpg', '.jpeg'))])
+        filepath = self.openFile("Open image", [("Image files", ('.JPEG','.JPG','.PNG','.png', '.jpg', '.jpeg'))])
         if filepath:
             image = cv2.imread(filepath)
             if image is None:
@@ -296,7 +295,7 @@ class TextInterceptor:
 
     # Function to implement
     def extractQRCodeFromImage(self):
-        filepath = self.openFile("Open image", [("Image files", ('.png', '.jpg', '.jpeg'))])
+        filepath = self.openFile("Open image", [("Image files", ('.JPEG','.JPG','.PNG', '.png', '.jpg', '.jpeg'))])
         if filepath:
             image = cv2.imread(filepath)
             if image is None:
